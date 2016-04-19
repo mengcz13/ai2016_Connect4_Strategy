@@ -88,10 +88,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Judge.cpp" />
+    <ClCompile Include="MCSolver.cpp" />
     <ClCompile Include="Strategy.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Judge.h" />
+    <ClInclude Include="MCSolver.h" />
     <ClInclude Include="Point.h" />
     <ClInclude Include="Strategy.h" />
   </ItemGroup>

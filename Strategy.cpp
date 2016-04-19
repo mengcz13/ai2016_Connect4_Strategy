@@ -54,12 +54,6 @@ extern "C" __declspec(dllexport) Point* getPoint(const int M, const int N, const
 		}
 	}
     */
-	static int position_x = 0;
-	if (top[position_x] > 0) {
-		x = top[position_x] - 1;
-		y = position_x;
-		++position_x;
-	}
 	
 	/*
 		不要更改这段代码
