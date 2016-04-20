@@ -41,34 +41,38 @@ namespace std {
 	class MCSolver {
 	public:
 		MCSolver(const int M, const int N, const int nX, const int nY) : row(M), column(N), current_root(0), noX(nX), noY(nY) {
-			monte_carlo_board = new int*[M];
-			for (int i = 0; i < M; ++i) {
-				monte_carlo_board[i] = new int[N];
-				memset(monte_carlo_board[i], 0, sizeof(int) * N);
+			monte_carlo_board = new int*[MAXROW];
+			for (int i = 0; i < MAXROW; ++i) {
+				monte_carlo_board[i] = new int[MAXCOLUMN];
+				memset(monte_carlo_board[i], 0, sizeof(int) * MAXCOLUMN);
 			}
 			srand(time(NULL));
-			log.open("log.txt", fstream::out);
 		}
 		~MCSolver() {
 			for (int i = 0; i < row; ++i) {
 				delete[]monte_carlo_board[i];
 			}
 			delete[]monte_carlo_board;
-			log.close();
 		}
 		void next_step(const int* top, int** board, const int lastX, const int lastY, int& x, int& y);
+		void reset_solver(const int M, const int N, const int nX, const int nY) {
+			row = M;
+			column = N;
+			noX = nX;
+			noY = nY;
+			current_root = 0;
+			pool.clear();
+		}
 
 	private:
-		const int row;
-		const int column;
-		const int noX;
-		const int noY;
+		int row;
+		int column;
+		int noX;
+		int noY;
 		int current_root;
 		int** monte_carlo_board;
 		int** init_board;
 		vector<MCNode> pool;
-		// Log file for Debug
-		fstream log;
 
 		int choose_node(); // Choose node to simulate
 		bool node_has_child(int node); // Judge if current node is able to have child. If current node has won/lost/tie, no child possible.

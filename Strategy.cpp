@@ -56,6 +56,20 @@ extern "C" __declspec(dllexport) Point* getPoint(const int M, const int N, const
     */
 
 	static MCSolver mcsolver(M, N, noX, noY);
+	if (lastX == -1 && lastY == -1)
+		mcsolver.reset_solver(M, N, noX, noY);
+	else {
+		int enemynum = 0, mynum = 0;
+		for (int i = 0; i < M; ++i)
+			for (int j = 0; j < N; ++j) {
+				if (board[i][j] == ENEMY_ACT)
+					++enemynum;
+				if (board[i][j] == MY_ACT)
+					++mynum;
+			}
+		if (enemynum == 1 && mynum == 0)
+			mcsolver.reset_solver(M, N, noX, noY);
+	}
 	mcsolver.next_step(top, board, lastX, lastY, x, y);
 	
 	/*

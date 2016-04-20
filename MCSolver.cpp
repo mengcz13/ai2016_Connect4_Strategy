@@ -2,7 +2,7 @@
 
 using namespace std;
 
-const int SIMTIME = 1000; // Fixed simulation time
+const int SIMTIME = 100; // Fixed simulation time
 
 int MCNode::simulate(int** monte_carlo_board, int row, int column, int noX, int noY) {
 	int temptop[MAXCOLUMN];
@@ -59,7 +59,7 @@ void MCSolver::next_step(const int* top, int** board, const int lastX, const int
 	}
 	init_board = board;
 	// while (time enough) {
-	for (int i = 0; i < 1000; ++i)
+	for (int i = 0; i < 10000; ++i)
 		simulate_at(choose_node());
 	// }
 
@@ -79,7 +79,6 @@ int MCSolver::choose_node() {
 	int choose = current_root;
 	while (node_has_child(choose)) {
 		for (int i = 0; i < column; ++i) {
-			// log << nodeat(choose).top[i] << endl; // Debug
 			if (nodeat(choose).child[i] == 0 && nodeat(choose).top[i] > 0) {
 				expand_node_at(choose, i);
 				MCNode& newnode = nodeat(nodeat(choose).child[i]);
@@ -109,7 +108,7 @@ bool MCSolver::node_has_child(int node) {
 }
 
 int MCSolver::get_best_child_at(int node) {
-	double max_value = -1;
+	double max_value = -1e8;
 	int max_child = 0;
 	// Choose max_value child
 	for (int i = 0; i < column; ++i) {
@@ -151,7 +150,7 @@ void MCSolver::simulate_at(int node) {
 
 int MCSolver::choose_step() {
 	MCNode& croot = nodeat(current_root);
-	double max_value = -1;
+	double max_value = -1e8;
 	int max_child = 0;
 	for (int i = 0; i < column; ++i) {
 		if (nodeat(croot.child[i]).test_time == 0 && croot.top[i] > 0)
