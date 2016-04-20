@@ -5,6 +5,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
 
 const int MY_ACT = 2;
 const int ENEMY_ACT = 1;
@@ -15,22 +16,26 @@ const int MAXROW = 12;
 const int MAXCOLUMN = 12;
 
 namespace std {
+	inline double UCT_func(int win_time, int test_time, int parent_test_time, double weight) {
+		return (double)win_time / (double)test_time + weight * sqrt(2 * log((double)parent_test_time) / test_time);
+	}
+
 	struct MCNode {
 		Point move; // The position of this move
 		int who; // Who did the move
 		int test_time; // How many times this board has been simulated
-		int win_time; // How many times this board has won during simulation
-		double value; // Value used by UCT
+		int win_time; // How many times this board has won during simulation. Notice that it is a net value (win - lost)
+		// double value; // Value used by UCT
 		int child[MAXCOLUMN]; // Possible next step
 		int top[MAXCOLUMN]; // Top array at this node
 		int parent;
 
-		MCNode() : move(Point(0, 0)), who(0), test_time(0), win_time(0), value(-1), parent(-1) {
+		MCNode() : move(Point(0, 0)), who(0), test_time(0), win_time(0), parent(-1) {
 			memset(child, 0, sizeof(child));
 			memset(top, 0, sizeof(top));
 		}
 
-		int simulate(int** monte_carlo_board); // Simulate once at current node and return result
+		int simulate(int** monte_carlo_board, int row, int column, int noX, int noY); // Simulate once at current node and return result
 	};
 
 	class MCSolver {
@@ -42,14 +47,16 @@ namespace std {
 				memset(monte_carlo_board[i], 0, sizeof(int) * N);
 			}
 			srand(time(NULL));
+			log.open("log.txt", fstream::out);
 		}
 		~MCSolver() {
 			for (int i = 0; i < row; ++i) {
 				delete[]monte_carlo_board[i];
 			}
 			delete[]monte_carlo_board;
+			log.close();
 		}
-		void next_step(const int* top, const int** board, const int lastX, const int lastY, int& x, int& y);
+		void next_step(const int* top, int** board, const int lastX, const int lastY, int& x, int& y);
 
 	private:
 		const int row;
@@ -58,14 +65,18 @@ namespace std {
 		const int noY;
 		int current_root;
 		int** monte_carlo_board;
+		int** init_board;
 		vector<MCNode> pool;
+		// Log file for Debug
+		fstream log;
 
 		int choose_node(); // Choose node to simulate
+		bool node_has_child(int node); // Judge if current node is able to have child. If current node has won/lost/tie, no child possible.
 		int get_best_child_at(int node); // Choose best child of some node according to some policy
 		void simulate_at(int node); // Do simulate and refresh values
-		int choose_step(); // Choose next step
+		int choose_step(); // Choose next step, return the selected column number
 		void move_current_root_to(int lastY); // Move current root
-		void expand_node_at(int node, Point& step); // Expand node for a column
+		void expand_node_at(int node, int lastY); // Expand node for a column
 
 		MCNode& nodeat(int node) { return pool.at(node);  }
 	};

@@ -54,6 +54,9 @@ extern "C" __declspec(dllexport) Point* getPoint(const int M, const int N, const
 		}
 	}
     */
+
+	static MCSolver mcsolver(M, N, noX, noY);
+	mcsolver.next_step(top, board, lastX, lastY, x, y);
 	
 	/*
 		不要更改这段代码
