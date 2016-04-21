@@ -77,7 +77,7 @@ int MCSolver::choose_node() {
 	}
 
 	int choose = current_root;
-	while (node_has_child(choose)) {
+	while (node_has_child(choose) == NOMUST) {
 		for (int i = 0; i < column; ++i) {
 			if (nodeat(choose).child[i] == 0 && nodeat(choose).top[i] > 0) {
 				expand_node_at(choose, i);
@@ -92,24 +92,41 @@ int MCSolver::choose_node() {
 	return choose;
 }
 
-bool MCSolver::node_has_child(int node) {
-	if (node == 0)
-		return true; // Case for first step, it must have children.
+int MCSolver::node_has_child(int node) {
+	if (nodeat(node).fixed_fate != UNCLEAR)
+		return nodeat(node).fixed_fate;
+	if (node == 0) {
+		nodeat(node).fixed_fate = NOMUST;
+		return NOMUST; // Case for first step, it must have children.
+	}
 	MCNode& laststep = nodeat(node);
 	if (laststep.who == MY_ACT) {
-		if (machineWin(laststep.move.x, laststep.move.y, row, column, monte_carlo_board) || isTie(column, laststep.top))
-			return false;
+		if (machineWin(laststep.move.x, laststep.move.y, row, column, monte_carlo_board)) {
+			nodeat(node).fixed_fate = MUST_WIN;
+			return MUST_WIN;
+		}
+		else if (isTie(column, laststep.top)) {
+			nodeat(node).fixed_fate = MUST_TIE;
+			return MUST_TIE;
+		}
 	}
 	else if (laststep.who == ENEMY_ACT) {
-		if (userWin(laststep.move.x, laststep.move.y, row, column, monte_carlo_board) || isTie(column, laststep.top))
-			return false;
+		if (userWin(laststep.move.x, laststep.move.y, row, column, monte_carlo_board)) {
+			nodeat(node).fixed_fate = MUST_LOSE;
+			return MUST_LOSE;
+		}
+		else if (isTie(column, laststep.top)) {
+			nodeat(node).fixed_fate = MUST_TIE;
+			return MUST_TIE;
+		}
 	}
-	return true;
+	nodeat(node).fixed_fate = NOMUST;
+	return NOMUST;
 }
 
 int MCSolver::get_best_child_at(int node) {
 	double max_value = -1e8;
-	int max_child = 0;
+	int max_child = -1;
 	// Choose max_value child
 	for (int i = 0; i < column; ++i) {
 		if (nodeat(node).child[i] > 0) {
@@ -125,26 +142,38 @@ int MCSolver::get_best_child_at(int node) {
 }
 
 void MCSolver::simulate_at(int node) {
-	int backup[MAXROW][MAXCOLUMN];
-	for (int i = 0; i < row; ++i)
-		for (int j = 0; j < column; ++j)
-			backup[i][j] = monte_carlo_board[i][j];
-
 	int simtime = 0, total_res = 0;
-	for (int t = 0; t < SIMTIME; ++t) {
-		total_res += nodeat(node).simulate(monte_carlo_board, row, column, noX, noY);
-		++simtime;
-
+	if (nodeat(node).fixed_fate == MUST_WIN || nodeat(node).fixed_fate == MUST_LOSE) { // Case when the result is fixed
+		simtime = total_res = SIMTIME;
+	}
+	else {
+		int backup[MAXROW][MAXCOLUMN];
 		for (int i = 0; i < row; ++i)
 			for (int j = 0; j < column; ++j)
-				monte_carlo_board[i][j] = backup[i][j];
+				backup[i][j] = monte_carlo_board[i][j];
+
+		for (int t = 0; t < SIMTIME; ++t) {
+			total_res += nodeat(node).simulate(monte_carlo_board, row, column, noX, noY);
+			++simtime;
+
+			for (int i = 0; i < row; ++i)
+				for (int j = 0; j < column; ++j)
+					monte_carlo_board[i][j] = backup[i][j];
+		}
 	}
 	int p = node;
-	while (p != current_root) {
+	while (p != nodeat(current_root).parent) {
 		nodeat(p).test_time += simtime;
 		nodeat(p).win_time += total_res;
 		total_res = -total_res;
 		p = nodeat(p).parent;
+	}
+	// Special case when node has fixed fate
+	if (nodeat(node).fixed_fate == MUST_WIN) {
+		nodeat(nodeat(node).parent).win_time = -nodeat(nodeat(node).parent).test_time;
+	}
+	else if (nodeat(node).fixed_fate == MUST_LOSE) {
+		nodeat(nodeat(node).parent).win_time = -nodeat(nodeat(node).parent).test_time;
 	}
 }
 
@@ -152,13 +181,19 @@ int MCSolver::choose_step() {
 	MCNode& croot = nodeat(current_root);
 	double max_value = -1e8;
 	int max_child = 0;
+	// int last_step_ever_want = 0;
 	for (int i = 0; i < column; ++i) {
-		if (nodeat(croot.child[i]).test_time == 0 && croot.top[i] > 0)
-			return i;
-		double nodevalue = UCT_func(nodeat(croot.child[i]).win_time, nodeat(croot.child[i]).test_time, croot.test_time, 0);
-		if (nodevalue > max_value && croot.top[i] > 0) {
-			max_value = nodevalue;
-			max_child = i;
+		if (croot.top[i] > 0 && croot.child[i] > 0) {
+			MCNode child = nodeat(croot.child[i]);
+			if (child.fixed_fate == MUST_WIN) {
+				return i;
+			}
+			// double nodevalue = UCT_func(nodeat(croot.child[i]).win_time, nodeat(croot.child[i]).test_time, croot.test_time, 0);
+			double nodevalue = (double)child.win_time / (double)child.test_time; // Just for speed
+			if (nodevalue > max_value) {
+				max_value = nodevalue;
+				max_child = i;
+			}
 		}
 	}
 	return max_child;

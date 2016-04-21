@@ -15,6 +15,12 @@ const double WEIGHT = 1;
 const int MAXROW = 12;
 const int MAXCOLUMN = 12;
 
+const int MUST_WIN = 1;
+const int MUST_LOSE = -1;
+const int MUST_TIE = 2;
+const int NOMUST = 0;
+const int UNCLEAR = -2;
+
 namespace std {
 	inline double UCT_func(int win_time, int test_time, int parent_test_time, double weight) {
 		return (double)win_time / (double)test_time + weight * sqrt(2 * log((double)parent_test_time) / test_time);
@@ -29,8 +35,9 @@ namespace std {
 		int child[MAXCOLUMN]; // Possible next step
 		int top[MAXCOLUMN]; // Top array at this node
 		int parent;
+		int fixed_fate; // If must win/lose at this node, this value is 1/-1, else it is 0. If it has not been calculated, it is -2;
 
-		MCNode() : move(Point(0, 0)), who(0), test_time(0), win_time(0), parent(-1) {
+		MCNode() : move(Point(0, 0)), who(0), test_time(0), win_time(0), parent(-1), fixed_fate(UNCLEAR) {
 			memset(child, 0, sizeof(child));
 			memset(top, 0, sizeof(top));
 		}
@@ -75,7 +82,7 @@ namespace std {
 		vector<MCNode> pool;
 
 		int choose_node(); // Choose node to simulate
-		bool node_has_child(int node); // Judge if current node is able to have child. If current node has won/lost/tie, no child possible.
+		int node_has_child(int node); // Judge if current node is able to have child. If current node has won/lost/tie, no child possible.
 		int get_best_child_at(int node); // Choose best child of some node according to some policy
 		void simulate_at(int node); // Do simulate and refresh values
 		int choose_step(); // Choose next step, return the selected column number
