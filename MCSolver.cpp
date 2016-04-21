@@ -1,4 +1,5 @@
 #include "MCSolver.h"
+#include <cassert>
 
 using namespace std;
 
@@ -138,13 +139,41 @@ int MCSolver::get_best_child_at(int node) {
 			}
 		}
 	}
+	assert(max_child != -1);
 	return nodeat(node).child[max_child];
 }
 
 void MCSolver::simulate_at(int node) {
+	const int ffate = node_has_child(node);
 	int simtime = 0, total_res = 0;
-	if (nodeat(node).fixed_fate == MUST_WIN || nodeat(node).fixed_fate == MUST_LOSE) { // Case when the result is fixed
+	if (ffate == MUST_WIN || ffate == MUST_LOSE) { // Case when the result is fixed
 		simtime = total_res = SIMTIME;
+		//nodeat(node).test_time += simtime;
+		//nodeat(node).win_time += total_res;
+
+		int p = node;
+		while (p != nodeat(current_root).parent) {
+			nodeat(p).test_time += simtime;
+			nodeat(p).win_time += total_res;
+			total_res = -total_res;
+			p = nodeat(p).parent;
+		}
+
+		nodeat(nodeat(node).parent).win_time = -nodeat(nodeat(node).parent).test_time;
+
+		//MCNode& parent = nodeat(nodeat(node).parent);
+		//parent.test_time += simtime;
+		//int diff = -parent.test_time - parent.win_time;
+		//parent.win_time = -parent.test_time;
+		//diff = -diff;
+
+		//int p = parent.parent;
+		//while (p != nodeat(current_root).parent) {
+		//	nodeat(p).test_time += simtime;
+		//	nodeat(p).win_time += diff;
+		//	diff = -diff;
+		//	p = nodeat(p).parent;
+		//}
 	}
 	else {
 		int backup[MAXROW][MAXCOLUMN];
@@ -160,21 +189,36 @@ void MCSolver::simulate_at(int node) {
 				for (int j = 0; j < column; ++j)
 					monte_carlo_board[i][j] = backup[i][j];
 		}
+
+		int p = node;
+		while (p != nodeat(current_root).parent) {
+			nodeat(p).test_time += simtime;
+			nodeat(p).win_time += total_res;
+			total_res = -total_res;
+			p = nodeat(p).parent;
+		}
 	}
-	int p = node;
-	while (p != nodeat(current_root).parent) {
-		nodeat(p).test_time += simtime;
-		nodeat(p).win_time += total_res;
-		total_res = -total_res;
-		p = nodeat(p).parent;
-	}
+	//int p = node;
+	//if (ffate == MUST_WIN || ffate == MUST_LOSE) {
+	//	MCNode& parent = nodeat(nodeat(node).parent);
+	//	parent.test_time += simtime;
+	//	int 
+	//}
+	//else {
+	//	while (p != nodeat(current_root).parent) {
+	//		nodeat(p).test_time += simtime;
+	//		nodeat(p).win_time += total_res;
+	//		total_res = -total_res;
+	//		p = nodeat(p).parent;
+	//	}
+	//}
 	// Special case when node has fixed fate
-	if (nodeat(node).fixed_fate == MUST_WIN) {
-		nodeat(nodeat(node).parent).win_time = -nodeat(nodeat(node).parent).test_time;
-	}
-	else if (nodeat(node).fixed_fate == MUST_LOSE) {
-		nodeat(nodeat(node).parent).win_time = -nodeat(nodeat(node).parent).test_time;
-	}
+	//if (ffate == MUST_WIN) {
+	//	nodeat(nodeat(node).parent).win_time = -nodeat(nodeat(node).parent).test_time;
+	//}
+	//else if (ffate == MUST_LOSE) {
+	//	nodeat(nodeat(node).parent).win_time = -nodeat(nodeat(node).parent).test_time;
+	//}
 }
 
 int MCSolver::choose_step() {
