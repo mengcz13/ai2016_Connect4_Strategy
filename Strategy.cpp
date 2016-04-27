@@ -55,22 +55,20 @@ extern "C" __declspec(dllexport) Point* getPoint(const int M, const int N, const
 	}
     */
 
-	static MCSolver mcsolver(M, N, noX, noY);
-	if (lastX == -1 && lastY == -1)
-		mcsolver.reset_solver(M, N, noX, noY);
-	else {
-		int enemynum = 0, mynum = 0;
-		for (int i = 0; i < M; ++i)
-			for (int j = 0; j < N; ++j) {
-				if (board[i][j] == ENEMY_ACT)
-					++enemynum;
-				if (board[i][j] == MY_ACT)
-					++mynum;
-			}
-		if (enemynum == 1 && mynum == 0)
-			mcsolver.reset_solver(M, N, noX, noY);
+	// UCT Method
+	int pointnum = 0, enemynum = 0, mynum = 0;
+	pointnum = point_num(M, N, board, enemynum, mynum);
+	if (pointnum & 1) {
+		getPoint_second(M, N, top, board, lastX, lastY, noX, noY, enemynum, mynum, x, y);
 	}
-	mcsolver.next_step(top, board, lastX, lastY, x, y);
+	else {
+		getPoint_first(M, N, top, board, lastX, lastY, noX, noY, enemynum, mynum, x, y);
+	}
+
+	// ANN Method
+	//static ANN ann;
+	//y = ann.get_output_column_for_me(board, M, N, noX, noY, top);
+	//x = top[y] - 1;
 	
 	/*
 		不要更改这段代码
@@ -103,3 +101,35 @@ void clearArray(int M, int N, int** board){
 /*
 	添加你自己的辅助函数，你可以声明自己的类、函数，添加新的.h .cpp文件来辅助实现你的想法
 */
+
+int point_num(const int M, const int N, int** board, int& enemynum, int& mynum) {
+	for (int i = 0; i < M; ++i) {
+		for (int j = 0; j < N; ++j) {
+			if (board[i][j] == ENEMY_ACT)
+				++enemynum;
+			else if (board[i][j] == MY_ACT)
+				++mynum;
+		}
+	}
+	return enemynum + mynum;
+}
+
+void getPoint_first(const int M, const int N, const int* top, int** board,
+	const int lastX, const int lastY, const int noX, const int noY, int enemynum, int mynum, int& x, int& y) {
+	static MCSolver mcsolver(M, N, noX, noY);
+	if (lastX == -1 && lastY == -1)
+		mcsolver.reset_solver(M, N, noX, noY);
+	else if (enemynum == 1 && mynum == 0)
+			mcsolver.reset_solver(M, N, noX, noY);
+	mcsolver.next_step(top, board, lastX, lastY, x, y);
+}
+
+void getPoint_second(const int M, const int N, const int* top, int** board,
+	const int lastX, const int lastY, const int noX, const int noY, int enemynum, int mynum, int& x, int& y) {
+	static MCSolver mcsolver(M, N, noX, noY);
+	if (lastX == -1 && lastY == -1)
+		mcsolver.reset_solver(M, N, noX, noY);
+	else if (enemynum == 1 && mynum == 0)
+		mcsolver.reset_solver(M, N, noX, noY);
+	mcsolver.next_step(top, board, lastX, lastY, x, y);
+}

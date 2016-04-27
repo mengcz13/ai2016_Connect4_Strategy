@@ -1,9 +1,12 @@
 #include "MCSolver.h"
 #include <cassert>
+#include <Windows.h>
 
 using namespace std;
-
-const int SIMTIME = 100; // Fixed simulation time
+// 20 40000
+const int SIMTIME = 4; // Fixed simulation time
+// const int CHOOSETIME = 1000000;
+const int TIMELIMIT = 4; // TIMELIMIT(second)
 
 int MCNode::simulate(int** monte_carlo_board, int row, int column, int noX, int noY) {
 	int temptop[MAXCOLUMN];
@@ -28,9 +31,17 @@ int MCNode::simulate(int** monte_carlo_board, int row, int column, int noX, int 
 			return 0;
 		}
 
+		// ANN simulation
+		//static ANN ann;
+		//int choose_col = ann.get_output_column_for_me(monte_carlo_board, row, column, noX, noY, temptop);
+		//while (temptop[choose_col] <= 0)
+		//	choose_col = ann.get_output_column_for_me(monte_carlo_board, row, column, noX, noY, temptop);
+		// ANN simulation end
+
 		int choose_col = rand() % column;
 		while (temptop[choose_col] <= 0)
 			choose_col = rand() % column;
+
 		lastmove.x = temptop[choose_col] - 1;
 		lastmove.y = choose_col;
 		if (lastwho == MY_ACT)
@@ -59,17 +70,38 @@ void MCSolver::next_step(const int* top, int** board, const int lastX, const int
 		move_current_root_to(lastY);
 	}
 	init_board = board;
-	// while (time enough) {
-	for (int i = 0; i < 10000; ++i)
+
+	LARGE_INTEGER StartingTime, EndingTime, ElapsedMicroseconds;
+	LARGE_INTEGER Frequency;
+	QueryPerformanceFrequency(&Frequency);
+	QueryPerformanceCounter(&StartingTime);
+	for (; ;) {
 		simulate_at(choose_node());
+
+		QueryPerformanceCounter(&EndingTime);
+		ElapsedMicroseconds.QuadPart = EndingTime.QuadPart - StartingTime.QuadPart;
+		ElapsedMicroseconds.QuadPart *= 1000000;
+		ElapsedMicroseconds.QuadPart /= Frequency.QuadPart;
+		if (ElapsedMicroseconds.QuadPart >= TIMELIMIT * 1000000)
+			break;
+	}
+
+	// while (time enough) {
+	//for (int i = 0; i < CHOOSETIME; ++i)
+	//	simulate_at(choose_node());
 	// }
 
 	y = choose_step();
 	x = top[y] - 1;
-	move_current_root_to(y);
+
+	// move_current_root_to(y);
+	
+	// Build a new tree every step, or the memory will be easily full...
+	current_root = 0;
+	pool.clear();
 }
 
-int MCSolver::choose_node() {
+size_t MCSolver::choose_node() {
 	// Restore current board, modify it in the process of choosing
 	for (int i = 0; i < row; ++i) {
 		for (int j = 0; j < column; ++j) {
@@ -77,7 +109,7 @@ int MCSolver::choose_node() {
 		}
 	}
 
-	int choose = current_root;
+	size_t choose = current_root;
 	while (node_has_child(choose) == NOMUST) {
 		for (int i = 0; i < column; ++i) {
 			if (nodeat(choose).child[i] == 0 && nodeat(choose).top[i] > 0) {
@@ -93,7 +125,7 @@ int MCSolver::choose_node() {
 	return choose;
 }
 
-int MCSolver::node_has_child(int node) {
+int MCSolver::node_has_child(size_t node) {
 	if (nodeat(node).fixed_fate != UNCLEAR)
 		return nodeat(node).fixed_fate;
 	if (node == 0) {
@@ -125,7 +157,7 @@ int MCSolver::node_has_child(int node) {
 	return NOMUST;
 }
 
-int MCSolver::get_best_child_at(int node) {
+size_t MCSolver::get_best_child_at(size_t node) {
 	double max_value = -1e8;
 	int max_child = -1;
 	// Choose max_value child
@@ -139,41 +171,26 @@ int MCSolver::get_best_child_at(int node) {
 			}
 		}
 	}
-	assert(max_child != -1);
 	return nodeat(node).child[max_child];
 }
 
-void MCSolver::simulate_at(int node) {
+void MCSolver::simulate_at(size_t node) {
 	const int ffate = node_has_child(node);
 	int simtime = 0, total_res = 0;
 	if (ffate == MUST_WIN || ffate == MUST_LOSE) { // Case when the result is fixed
 		simtime = total_res = SIMTIME;
-		//nodeat(node).test_time += simtime;
-		//nodeat(node).win_time += total_res;
-
-		int p = node;
-		while (p != nodeat(current_root).parent) {
+		size_t p = node;
+		while (1) {
 			nodeat(p).test_time += simtime;
 			nodeat(p).win_time += total_res;
 			total_res = -total_res;
+			if (p == current_root)
+				break;
 			p = nodeat(p).parent;
 		}
 
 		nodeat(nodeat(node).parent).win_time = -nodeat(nodeat(node).parent).test_time;
 
-		//MCNode& parent = nodeat(nodeat(node).parent);
-		//parent.test_time += simtime;
-		//int diff = -parent.test_time - parent.win_time;
-		//parent.win_time = -parent.test_time;
-		//diff = -diff;
-
-		//int p = parent.parent;
-		//while (p != nodeat(current_root).parent) {
-		//	nodeat(p).test_time += simtime;
-		//	nodeat(p).win_time += diff;
-		//	diff = -diff;
-		//	p = nodeat(p).parent;
-		//}
 	}
 	else {
 		int backup[MAXROW][MAXCOLUMN];
@@ -190,42 +207,25 @@ void MCSolver::simulate_at(int node) {
 					monte_carlo_board[i][j] = backup[i][j];
 		}
 
-		int p = node;
-		while (p != nodeat(current_root).parent) {
+		size_t p = node;
+		while (1) {
 			nodeat(p).test_time += simtime;
 			nodeat(p).win_time += total_res;
 			total_res = -total_res;
+			if (p == current_root)
+				break;
 			p = nodeat(p).parent;
 		}
 	}
-	//int p = node;
-	//if (ffate == MUST_WIN || ffate == MUST_LOSE) {
-	//	MCNode& parent = nodeat(nodeat(node).parent);
-	//	parent.test_time += simtime;
-	//	int 
-	//}
-	//else {
-	//	while (p != nodeat(current_root).parent) {
-	//		nodeat(p).test_time += simtime;
-	//		nodeat(p).win_time += total_res;
-	//		total_res = -total_res;
-	//		p = nodeat(p).parent;
-	//	}
-	//}
-	// Special case when node has fixed fate
-	//if (ffate == MUST_WIN) {
-	//	nodeat(nodeat(node).parent).win_time = -nodeat(nodeat(node).parent).test_time;
-	//}
-	//else if (ffate == MUST_LOSE) {
-	//	nodeat(nodeat(node).parent).win_time = -nodeat(nodeat(node).parent).test_time;
-	//}
 }
 
 int MCSolver::choose_step() {
+
+	// static ANN ann;
+
 	MCNode& croot = nodeat(current_root);
 	double max_value = -1e8;
 	int max_child = 0;
-	// int last_step_ever_want = 0;
 	for (int i = 0; i < column; ++i) {
 		if (croot.top[i] > 0 && croot.child[i] > 0) {
 			MCNode child = nodeat(croot.child[i]);
@@ -234,6 +234,11 @@ int MCSolver::choose_step() {
 			}
 			// double nodevalue = UCT_func(nodeat(croot.child[i]).win_time, nodeat(croot.child[i]).test_time, croot.test_time, 0);
 			double nodevalue = (double)child.win_time / (double)child.test_time; // Just for speed
+			// ANN item
+			//ann.get_output_column_for_me(init_board, row, column, noX, noY, croot.top);
+			//double score = ann.score_for_out(i);
+			//nodevalue += (0.01) * score;
+			// ANN end
 			if (nodevalue > max_value) {
 				max_value = nodevalue;
 				max_child = i;
@@ -250,7 +255,7 @@ void MCSolver::move_current_root_to(int lastY) {
 	current_root = nodeat(current_root).child[lastY];
 }
 
-void MCSolver::expand_node_at(int node, int lastY) {
+void MCSolver::expand_node_at(size_t node, int lastY) {
 	MCNode tempnode;
 	Point step(nodeat(node).top[lastY] - 1, lastY);
 	if (step.x == noX && step.y == noY) // In case step is at the point not allowed
@@ -264,11 +269,73 @@ void MCSolver::expand_node_at(int node, int lastY) {
 	for (int i = 0; i < column; ++i) {
 		tempnode.top[i] = nodeat(node).top[i];
 	}
-	// tempnode.top[step.y] = step.x - 1;
 	tempnode.top[step.y] = step.x;
 	if (step.y == noY && tempnode.top[step.y] - 1 == noX) {
 		--tempnode.top[step.y];
 	}
 	pool.push_back(tempnode);
 	nodeat(node).child[step.y] = pool.size() - 1;
+}
+
+int ANN::get_output_column_for_me(int** board, const int M, const int N, const int noX, const int noY, const int* top) {
+	memset(transboard, 0, sizeof(double) * n_in);
+	for (int i = 0; i < M; ++i) {
+		for (int j = 0; j < N; ++j) {
+			int ele = board[i][j];
+			double pair = 0;
+			switch (ele) {
+			case 0:
+				pair = 1;
+				break;
+			case 1:
+				pair = 4;
+				break;
+			case 2:
+				pair = 3;
+				break;
+			}
+			transboard[i * MAXROW + j] = pair;
+		}
+	}
+	transboard[noX * MAXROW + noY] = 2;
+
+	//hidden layer
+	for (int i = 0; i < n_hidden; ++i) {
+		double tsum = 0;
+		for (int j = 0; j < n_in; ++j) {
+			tsum += transboard[j] * W1[j * n_hidden + i];
+		}
+		tsum += b1[i];
+		hidden_vec[i] = tanh(tsum);
+	}
+
+	//output layer(Softmax)
+	for (int i = 0; i < n_out; ++i) {
+		double tsum = 0;
+		for (int j = 0; j < n_hidden; ++j) {
+			tsum += hidden_vec[j] * W2[j * n_out + i];
+		}
+		tsum += b2[i];
+		output_vec[i] = exp(tsum);
+	}
+	double sumout = 0;
+	for (int i = 0; i < n_out; ++i) {
+		sumout += output_vec[i];
+	}
+	for (int i = 0; i < n_out; ++i) {
+		output_vec[i] /= sumout;
+	}
+
+	//return legal column chosen
+	double max = -1e8;
+	int choose = 0;
+	for (int i = 0; i < N; ++i) {
+		if (top[i] > 0) {
+			if (output_vec[i] > max) {
+				choose = i;
+				max = output_vec[i];
+			}
+		}
+	}
+	return choose;
 }
